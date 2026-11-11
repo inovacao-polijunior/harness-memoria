@@ -23,6 +23,7 @@ tabela — então uma tabela desatualizada não engana o agente, mas reprova o b
 | [0008](0008-herdar-pendencias-abertas.md)          | Herdar os itens abertos quando a última narrada não traz a lista          | implemented |
 | [0009](0009-adr-por-caminho-no-pretooluse.md)      | Injetar no PreToolUse de escrita os ADRs do mapa por caminho              | implemented |
 | [0010](0010-mapa-por-caminho-em-arquivo-proprio.md) | Deixar o mapa por caminho morar num arquivo próprio, apontado pelo CLAUDE.md | implemented |
+| [0011](0011-revisor-de-adr-como-agente-do-plugin.md) | Revisar a aderência a ADR com um agente do plugin, chamado sob demanda   | proposed    |
 
 ## Status
 
@@ -51,6 +52,7 @@ Supersessão é **bidirecional**: o novo declara `substitui:`, o antigo declara
 - **Reafirmação:** 0003
 - **Auditoria:** 0005
 - **Sensores (verificação no loop):** 0007
+- **Agentes do plugin:** 0011
 
 ## Regras
 

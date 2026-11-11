@@ -260,6 +260,17 @@ Os registros de `hooks/hooks.json` (`session_start.py` atende dois eventos):
 | `/encerrar-sessao`  | registrar a sessão NARRADA no diário antes de sair — o caminho primário da narrativa, agora que o hook só grava o piso |
 | `/auditar-docs`     | rodar a auditoria e corrigir o que falhar            |
 
+| Agente                        | Para quê                                                       |
+| ----------------------------- | -------------------------------------------------------------- |
+| `harness-memoria:revisor-adr` | conferir um diff contra os ADRs vivos e as invioláveis antes do PR e apontar só contradições, com a régua usada (ADR-0011) |
+
+O revisor é chamado sob demanda ("revise este branch contra os ADRs"), não por hook. Ele só
+lê, e para sem `.claude/harness.json`. Mas a `description` dele não passa pelo gate: os
+267 ch (~116 tok) entram no custo sempre ligado de toda sessão em que o plugin está
+habilitado, inclusive nos projetos que não adotaram o harness. Ele não recebe ADR nenhum do
+harness, porque o bloco do `SubagentStart` é reduzido e a injeção por caminho só dispara em
+escrita. Por isso o prompt manda ler o mapa "Qual ADR ler" e os ADRs de cada arquivo do diff.
+
 **`SessionEnd` não narra por default.** Ele só tenta o `claude -p` quando a variável de
 ambiente `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` está setada acima de ~21.000 (é a
 variável que a PRÓPRIA plataforma lê para esse hook; o `timeout` do `hooks.json` não

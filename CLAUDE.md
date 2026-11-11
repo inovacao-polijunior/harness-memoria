@@ -35,6 +35,7 @@ desde `docs/adr/0001-auto-hospedagem.md`.
 | Caminho                                      | ADRs                         |
 | -------------------------------------------- | ---------------------------- |
 | `.claude/harness.json`                       | 0001, 0007                   |
+| `agents/`                                    | 0004, 0009, 0011             |
 | `docs/adr/`                                  | 0001                         |
 | `docs/diario/`                               | 0001, 0005, 0006, 0008       |
 | `hooks/hooks.json`                           | 0002, 0003, 0004, 0007       |
