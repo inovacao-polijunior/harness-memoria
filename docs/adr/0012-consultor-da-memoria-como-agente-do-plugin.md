@@ -10,8 +10,9 @@ data: 2026-11-12
 - O plugin entrega o consultor em `agents/consultor-memoria.md`
   (`harness-memoria:consultor-memoria`). Ele só lê e responde pelo que o diário e os ADRs
   registram, com `arquivo:linha` em cada achado.
-- Quando o digest de becos sai cortado, o bloco do `SessionStart` manda perguntar ao
-  consultor. O bloco do `SubagentStart` continua mandando procurar à mão.
+- Quando o digest de becos sai cortado, o bloco do `SessionStart` manda chamar o consultor
+  antes de propor ou implementar uma mudança, e a `description` dele pede uso proativo. O
+  bloco do `SubagentStart` continua mandando procurar à mão.
 - O ponteiro só entra quando `agents/consultor-memoria.md` está no mesmo plugin que roda o
   hook (`consultor_disponivel`).
 
@@ -40,8 +41,8 @@ ferramentas Grep e Glob não existem: a busca é pelo Bash. Um agente com
 
 - A resposta tem de citar a fonte. Um "já tentamos" sem `arquivo:linha` não dá a quem
   pergunta como conferir, e um "não há registro" sem dizer onde procurou não diz nada.
-- Custo sempre ligado: a `description` mede 292 ch (~127 tok, pela razão `chars / 2,3` do
-  README), somando 559 ch (~243 tok) com a do revisor.
+- Custo sempre ligado: a `description` mede 343 ch (~149 tok, pela razão `chars / 2,3` do
+  README), somando 610 ch (~265 tok) com a do revisor.
 - O ponteiro do bloco não pode apontar para um agente que a sessão não tem.
 
 ## Decisão
@@ -58,8 +59,11 @@ ferramentas Grep e Glob não existem: a busca é pelo Bash. Um agente com
    registro"), até 5 achados com `arquivo:linha`, os relacionados e "Onde procurei" (os
    termos e as pastas).
 5. **O `SessionStart` aponta para ele.** Quando o digest sai cortado, a frase "Os outros N
-   estão em…" termina mandando perguntar a `harness-memoria:consultor-memoria`, em vez de
-   "procure por esse título". O nome vem de `consultor_disponivel()`, que confere
+   estão em…" termina com "Antes de propor ou implementar uma mudança, chame o subagente
+   `harness-memoria:consultor-memoria` com o que vai fazer", em vez de "procure por esse
+   título". A `description` do agente começa com "Use PROATIVAMENTE antes de propor ou
+   implementar uma mudança", o mesmo gatilho, que é o formato que a doc de subagentes indica
+   para a delegação automática. O nome vem de `consultor_disponivel()`, que confere
    `agents/consultor-memoria.md` ao lado do hook e lê o nome do plugin no manifesto. Sem o
    arquivo, a frase antiga volta. O bloco reduzido do `SubagentStart` mantém a frase
    antiga, porque subagente não chama subagente.
@@ -91,9 +95,30 @@ inventar achado. O `inherit` não foi medido, porque o Haiku acertou as sete.
 A frase "não vá ao código" entrou no prompt depois das rodadas: em 2 das 7 respostas o
 agente procurou em `services/api/`. Essa mudança não foi medida de novo.
 
-O ponteiro custa 94 ch a mais na prosa do digest (357 contra 263). Pelo ADR-0004, quem
-cede é o índice: nos três projetos acima ele perde uma linha (54→53, 40→39, 24→23), e o
-número de becos no bloco não muda.
+### Medição do acionamento automático
+
+Com o agente instalado (`f3329ec`), três sessões novas no ValidaNI receberam um pedido de
+implementação cuja lição estava num beco, sem citar o consultor. As três tinham o ponteiro no
+bloco injetado, conferido no transcript. A frase da época era "Antes de insistir numa
+abordagem que parece nova, pergunte ao subagente…", e a `description` dizia "Use antes de
+insistir numa abordagem que parece nova".
+
+| Pedido                                | Consultor chamado | De onde veio o aviso                          |
+| ------------------------------------- | ----------------- | --------------------------------------------- |
+| Modal de exclusão dentro da sidebar   | não               | comentário em `Sidebar.tsx`                   |
+| Subagentes em worktree, por épico     | não               | o próprio digest de becos (item 11 de 20)     |
+| Citar o ADR-0056 na tela de Progresso | não               | ADR-0081 d.9 e comentário em `ProgressoTab.tsx` |
+
+Nas três, a sessão procurou no código e nos ADRs, que é para onde o mapa "Qual ADR ler"
+aponta. Na terceira, o beco específico (`arquivo/2026-08j.md:53`, "ADR é endereço de
+código, não de produto") não apareceu. Daí a decisão 5 na forma atual: a frase passou de
+informação ("pergunte…") a gatilho ("antes de propor ou implementar…"), e a `description`
+pede uso proativo. A forma nova ainda não foi medida.
+
+O ponteiro custa 81 ch a mais na prosa do digest (344 contra 263). Pelo ADR-0004, quem
+cede é o índice: medido em 2026-11-12, o ValidaNI segue com 54 de 103 ADRs no índice, o
+rede-inspira passa de 40 para 39 e o plum-cali de 24 para 23. O número de becos no bloco
+não muda.
 
 ## Alternativas consideradas
 
@@ -141,9 +166,11 @@ perguntas medidas, o achado esperado veio em 5 a 10 chamadas.
 **Ruins, e aceitas:**
 
 - Para o Bash, "só lê" vale só pelo prompt, como no revisor (ADR-0011).
-- A `description` custa ~127 tok em toda sessão de todo projeto com o plugin habilitado,
+- A `description` custa ~149 tok em toda sessão de todo projeto com o plugin habilitado,
   inclusive nos que não adotaram o harness.
-- Cada consulta custa ~90 a 100 mil tokens no Haiku, contados no subagente.
+- Cada consulta custa de 31 mil a 56 mil tokens no Haiku e de 26 a 42 s, medidos no agente
+  carregado pelo plugin. Com o uso proativo, isso pode se repetir em boa parte dos pedidos
+  de implementação.
 - O ponteiro tira uma linha do índice de ADR quando o bloco está no teto.
 - A medição foi uma simulação com 7 perguntas de um só projeto, e o prompt mudou uma frase
   depois dela.
@@ -151,6 +178,10 @@ perguntas medidas, o achado esperado veio em 5 a 10 chamadas.
 ## Quando revisitar
 
 - Se Grep e Glob voltarem a existir na plataforma: tirar o Bash da lista `tools`.
+- Se, com a forma proativa, o consultor continuar sem ser chamado nos pedidos de
+  implementação: tirar o gatilho da `description` e da frase, e documentá-lo como
+  ferramenta de uso explícito. Se passar a ser chamado em edição trivial: estreitar o
+  gatilho.
 - Se um relatório do consultor citar um beco que não diz o que ele afirma, ou responder
   "não há registro" para algo registrado: medir o `inherit` nas mesmas 7 perguntas e no caso
   que falhou.

@@ -1,6 +1,6 @@
 ---
 name: consultor-memoria
-description: Responde se uma abordagem já foi tentada, ou por que algo é como é, procurando em todas as tentativas descartadas do diário (inclusive `arquivo/`) e em todos os ADRs, vivos e mortos, citando a fonte. Use antes de insistir numa abordagem que parece nova, em projeto com `.claude/harness.json`.
+description: Use PROATIVAMENTE antes de propor ou implementar uma mudança em projeto com `.claude/harness.json`, para saber se a abordagem já foi tentada ou decidida. Procura em todas as tentativas descartadas do diário (inclusive `arquivo/`) e em todos os ADRs, vivos e mortos, e devolve só o que achou, com `arquivo:linha`. Não serve para edição trivial.
 tools: Read, Grep, Glob, Bash
 model: haiku
 ---

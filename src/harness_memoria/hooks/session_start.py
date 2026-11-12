@@ -541,10 +541,13 @@ def _moldar_becos(cfg: Config, becos: list[str], total: int, reduzido: bool) -> 
     if faltam <= 0:
         resto = ""
     elif consultor:
+        # Frase de gatilho, e não de informação: a primeira versão ("antes de insistir numa
+        # abordagem que parece nova, pergunte…") foi injetada em 3 sessões de um consumidor
+        # real em 2026-11-12, e o consultor foi chamado em 0 (ADR-0012). O gatilho agora
+        # é o mesmo da `description` do agente: propor ou implementar uma mudança.
         resto = (
-            f"{onde}. Antes de insistir numa abordagem que parece nova, pergunte ao "
-            f"subagente `{consultor}`: ele procura em todos e devolve só o que achou, com a "
-            f"fonte."
+            f"{onde}. Antes de propor ou implementar uma mudança, chame o subagente "
+            f"`{consultor}` com o que vai fazer: ele procura nos {total} e cita a fonte."
         )
     else:
         resto = (

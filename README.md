@@ -266,17 +266,19 @@ Os registros de `hooks/hooks.json` (`session_start.py` atende dois eventos):
 | `harness-memoria:consultor-memoria` | responder "já tentamos isto?" procurando em todos os becos do diário (inclusive `arquivo/`) e em todos os ADRs, vivos e mortos, com `arquivo:linha` em cada achado (ADR-0012) |
 
 Os dois são chamados sob demanda, não por hook. Os dois só leem e param sem
-`.claude/harness.json`. Mas a `description` deles não passa pelo gate: os 559 ch (~243 tok)
+`.claude/harness.json`. Mas a `description` deles não passa pelo gate: os 610 ch (~265 tok)
 das duas entram no custo sempre ligado de toda sessão em que o plugin está habilitado,
 inclusive nos projetos que não adotaram o harness. Nenhum dos dois recebe ADR do harness,
 porque o bloco do `SubagentStart` é reduzido e a injeção por caminho só dispara em escrita.
 Por isso o revisor manda ler o mapa "Qual ADR ler" e os ADRs de cada arquivo do diff.
 
 O consultor é o destino da frase "Os outros N estão em…" do bloco do `SessionStart`: quando
-o digest de becos sai cortado, o bloco manda perguntar a ele. Roda no Haiku, e acertou 7 de
-7 perguntas com resposta conhecida no ValidaNI, a ~90 a 100 mil tokens cada, contados no
-subagente. Ele tem Bash porque nesta versão do Claude Code não existem as ferramentas Grep e
-Glob: sem o Bash, acertou 2 de 7.
+o digest de becos sai cortado, o bloco manda chamá-lo antes de propor ou implementar uma
+mudança, e a `description` dele pede uso proativo. A primeira versão só sugeria a consulta,
+e nas 3 sessões medidas o Claude não o chamou nenhuma vez (ADR-0012). Roda no Haiku: chamado
+de forma explícita, acertou as 7 perguntas com resposta conhecida no ValidaNI, a 31 a 56 mil
+tokens e 26 a 42 s cada. Ele tem Bash porque nesta versão do Claude Code não existem as
+ferramentas Grep e Glob: sem o Bash, acertou 2 de 7.
 
 **`SessionEnd` não narra por default.** Ele só tenta o `claude -p` quando a variável de
 ambiente `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` está setada acima de ~21.000 (é a
