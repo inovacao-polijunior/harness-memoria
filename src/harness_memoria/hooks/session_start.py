@@ -57,9 +57,11 @@ try:
     if __name__ == "__main__" and "--autoteste" not in sys.argv and L.gate_barato() is False:
         L.sair_sem_fazer_nada()
 
+    import json  # noqa: E402
     import re  # noqa: E402
     from dataclasses import replace  # noqa: E402
     from datetime import datetime  # noqa: E402
+    from functools import cache  # noqa: E402
     from pathlib import Path  # noqa: E402
 
     from harness_memoria import adr, diario  # noqa: E402
@@ -134,6 +136,10 @@ MAX_AUTOMATICAS_NO_BLOCO = 5
 #: produz, para que editar a frase sem editar o cheque não passe calado.
 ANUNCIO_DE_AUTOMATICAS = "registro(s) automático(s)"
 ANUNCIO_DE_ROTACAO = "Rotação do diário pendente"
+
+#: O agente que procura nos becos que o digest deixou de fora (ADR-0012), pelo nome do
+#: arquivo em `agents/`. O nome qualificado (`plugin:agente`) vem do manifesto do plugin.
+AGENTE_CONSULTOR = "consultor-memoria"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -255,7 +261,7 @@ def _blocos(
     #    entrada de 5.753 ch com limite 5.000 devolvia 3.681 e descartava `O que foi feito`
     #    para PRESERVAR a seção duplicada, que é rank 0 em `prioridade_secoes`.
     cota_entrada, cota_becos = cotas if cotas else (None, None)
-    bloco_becos, becos = _bloco_de_becos(cfg, cota_becos)
+    bloco_becos, becos = _bloco_de_becos(cfg, cota_becos, reduzido)
 
     bloco_entrada = ""
     if cfg.diario.injetar_ultima_entrada and not reduzido:
@@ -322,7 +328,9 @@ def _orcar(teto: int, natural: list[str], cfg: Config) -> tuple[int | None, int 
         return None, None
     if not entrada:
         return None, max(0, disponivel - len(SEPARADOR))
-    piso_becos = min(disponivel, _prosa_de_becos(cfg) + cfg.diario.teto_item_beco_chars)
+    piso_becos = min(
+        disponivel, _prosa_de_becos(cfg, reduzido=False) + cfg.diario.teto_item_beco_chars
+    )
     cota_becos = max(piso_becos, min(_com_separador(becos), disponivel - _com_separador(entrada)))
     return max(0, disponivel - cota_becos - len(SEPARADOR)), max(0, cota_becos - len(SEPARADOR))
 
@@ -464,7 +472,7 @@ def _bloco_de_regras(raiz: Path, cfg: Config, origem: str, reduzido: bool) -> st
     )
 
 
-def _bloco_de_becos(cfg: Config, cota: int | None) -> tuple[str, list[str]]:
+def _bloco_de_becos(cfg: Config, cota: int | None, reduzido: bool) -> tuple[str, list[str]]:
     """`(bloco, itens)`. `cota` é o espaço do BLOCO, prosa inclusa; `None` usa o configurado.
 
     O laço no fim não é paranoia: `teto_becos_chars` limita a SOMA DO TEXTO dos itens, e o
@@ -478,38 +486,70 @@ def _bloco_de_becos(cfg: Config, cota: int | None) -> tuple[str, list[str]]:
     """
     teto_itens = cfg.diario.teto_becos_chars
     if cota is not None:
-        teto_itens = max(0, min(teto_itens, cota - _prosa_de_becos(cfg)))
+        teto_itens = max(0, min(teto_itens, cota - _prosa_de_becos(cfg, reduzido)))
     becos, total = diario.becos_sem_saida(
         cfg.pasta_diario, replace(cfg.diario, teto_becos_chars=teto_itens)
     )
-    bloco = _moldar_becos(cfg, becos, total)
+    bloco = _moldar_becos(cfg, becos, total, reduzido)
     while cota is not None and len(becos) > 1 and len(bloco) > cota:
         becos = becos[:-1]
-        bloco = _moldar_becos(cfg, becos, total)
+        bloco = _moldar_becos(cfg, becos, total, reduzido)
     return bloco, becos
 
 
-def _prosa_de_becos(cfg: Config) -> int:
+def _prosa_de_becos(cfg: Config, reduzido: bool) -> int:
     """A prosa do bloco de becos, medida pelo código que a escreve.
 
     Item fictício porque `_moldar_becos` devolve "" para lista vazia — e é a frase do "os
     outros N estão em..." que faz esta prosa valer ~300 ch, não o cabeçalho. Medir em vez de
     fixar uma constante ao lado: quem editar a frase não tem como esquecer o orçamento.
     """
-    return len(_moldar_becos(cfg, ["x"], 9999)) - len("- x")
+    return len(_moldar_becos(cfg, ["x"], 9999, reduzido)) - len("- x")
 
 
-def _moldar_becos(cfg: Config, becos: list[str], total: int) -> str:
+@cache
+def consultor_disponivel() -> str | None:
+    """O nome qualificado do consultor da memória, ou `None` se ele não veio com este hook.
+
+    O ponteiro só entra no bloco quando o arquivo do agente está no MESMO plugin que roda
+    este hook: o hook e o agente saem no mesmo commit, então quem tem um tem o outro, e uma
+    versão sem o agente continua mandando procurar à mão. Ponteiro para um agente que não
+    existe é pior que ponteiro nenhum: a sessão perderia a chamada e o "procure" junto.
+    """
+    try:
+        raiz_do_plugin = Path(__file__).resolve().parents[3]
+        if not (raiz_do_plugin / "agents" / f"{AGENTE_CONSULTOR}.md").is_file():
+            return None
+        manifesto = raiz_do_plugin / ".claude-plugin" / "plugin.json"
+        nome = json.loads(manifesto.read_text(encoding="utf-8"))["name"]
+    except (OSError, ValueError, KeyError, TypeError, IndexError):
+        return None
+    return f"{nome}:{AGENTE_CONSULTOR}" if isinstance(nome, str) and nome else None
+
+
+def _moldar_becos(cfg: Config, becos: list[str], total: int, reduzido: bool) -> str:
     if not becos:
         return ""
     faltam = total - len(becos)
-    resto = (
+    onde = (
         f"\n\nOs outros {faltam} estão nas seções `### {diario.SECAO_BECOS}` de "
-        f"`{cfg.diario.pasta}/` e `{cfg.diario.pasta}/arquivo/` — procure por esse título "
-        f"antes de insistir numa abordagem que parece nova."
-        if faltam > 0
-        else ""
+        f"`{cfg.diario.pasta}/` e `{cfg.diario.pasta}/arquivo/`"
     )
+    # O bloco reduzido continua mandando procurar: ele vai para um subagente, e subagente
+    # não chama subagente.
+    consultor = None if reduzido else consultor_disponivel()
+    if faltam <= 0:
+        resto = ""
+    elif consultor:
+        resto = (
+            f"{onde}. Antes de insistir numa abordagem que parece nova, pergunte ao "
+            f"subagente `{consultor}`: ele procura em todos e devolve só o que achou, com a "
+            f"fonte."
+        )
+    else:
+        resto = (
+            f"{onde} — procure por esse título antes de insistir numa abordagem que parece nova."
+        )
     return (
         f"## Becos sem saída já explorados ({len(becos)} de {total}, "
         f"do mais recente para o mais antigo)\n\n"

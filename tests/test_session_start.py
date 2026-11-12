@@ -752,3 +752,59 @@ def test_pacote_quebrado_nao_derruba_a_sessao(tmp_path: Path):
     assert "Traceback" not in r.stderr, r.stderr
     assert "[contexto]" in r.stderr, r.stderr
     assert "SyntaxError" in r.stderr, r.stderr
+
+
+# --------------------------------------------------------------------------- #
+# Ponteiro para o consultor da memória (ADR-0012)
+# --------------------------------------------------------------------------- #
+
+CONSULTOR = "harness-memoria:consultor-memoria"
+
+
+def test_o_consultor_e_achado_ao_lado_do_hook():
+    """No repositório (e no cache do plugin, que tem o mesmo layout) o agente está lá."""
+    assert SS.consultor_disponivel() == CONSULTOR
+
+
+def test_digest_cortado_aponta_para_o_consultor(tmp_path: Path):
+    raiz = corpus(tmp_path / "proj", adrs=10, becos=100)
+    cfg = _cfg(raiz)
+    bloco = SS.montar(raiz, cfg, "startup")
+    assert "Os outros" in bloco, "o corpus tem de cortar o digest, senão o ponteiro não aparece"
+    assert f"`{CONSULTOR}`" in bloco
+    assert "procure por esse título" not in bloco, "dois caminhos para o mesmo resto"
+    assert len(bloco) <= SS.TETO_PLATAFORMA_CHARS
+    assert SS.conferir_fidelidade(raiz, cfg, bloco) == 0
+
+
+def test_bloco_do_subagente_continua_mandando_procurar(tmp_path: Path):
+    """Subagente não chama subagente: o ponteiro para o consultor seria inútil nele."""
+    raiz = corpus(
+        tmp_path / "proj", adrs=10, becos=100, config={"diario": {"teto_becos_chars": 12_000}}
+    )
+    cfg = _cfg(raiz)
+    reduzido = SS.montar(raiz, cfg, "startup", reduzido=True)
+    assert "Os outros" in reduzido
+    assert "procure por esse título" in reduzido
+    assert CONSULTOR not in reduzido
+    assert len(reduzido) <= SS.TETO_SUBAGENTE_CHARS
+
+
+def test_sem_o_agente_ao_lado_o_bloco_manda_procurar(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Versão do plugin sem o agente: ponteiro para agente inexistente é pior que nenhum."""
+    monkeypatch.setattr(SS, "consultor_disponivel", lambda: None)
+    raiz = corpus(tmp_path / "proj", adrs=10, becos=100)
+    bloco = SS.montar(raiz, _cfg(raiz), "startup")
+    assert "procure por esse título" in bloco
+    assert CONSULTOR not in bloco
+
+
+def test_digest_inteiro_nao_aponta_para_ninguem(tmp_path: Path):
+    """Sem corte não há resto a procurar, e o ponteiro só ocuparia o orçamento."""
+    raiz = corpus(tmp_path / "proj", adrs=10, becos=3)
+    bloco = SS.montar(raiz, _cfg(raiz), "startup")
+    assert " de 3," in bloco
+    assert "Os outros" not in bloco
+    assert CONSULTOR not in bloco

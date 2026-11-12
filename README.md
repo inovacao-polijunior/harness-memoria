@@ -263,13 +263,20 @@ Os registros de `hooks/hooks.json` (`session_start.py` atende dois eventos):
 | Agente                        | Para quê                                                       |
 | ----------------------------- | -------------------------------------------------------------- |
 | `harness-memoria:revisor-adr` | conferir um diff contra os ADRs vivos e as invioláveis antes do PR e apontar só contradições, com a régua usada (ADR-0011) |
+| `harness-memoria:consultor-memoria` | responder "já tentamos isto?" procurando em todos os becos do diário (inclusive `arquivo/`) e em todos os ADRs, vivos e mortos, com `arquivo:linha` em cada achado (ADR-0012) |
 
-O revisor é chamado sob demanda ("revise este branch contra os ADRs"), não por hook. Ele só
-lê, e para sem `.claude/harness.json`. Mas a `description` dele não passa pelo gate: os
-267 ch (~116 tok) entram no custo sempre ligado de toda sessão em que o plugin está
-habilitado, inclusive nos projetos que não adotaram o harness. Ele não recebe ADR nenhum do
-harness, porque o bloco do `SubagentStart` é reduzido e a injeção por caminho só dispara em
-escrita. Por isso o prompt manda ler o mapa "Qual ADR ler" e os ADRs de cada arquivo do diff.
+Os dois são chamados sob demanda, não por hook. Os dois só leem e param sem
+`.claude/harness.json`. Mas a `description` deles não passa pelo gate: os 559 ch (~243 tok)
+das duas entram no custo sempre ligado de toda sessão em que o plugin está habilitado,
+inclusive nos projetos que não adotaram o harness. Nenhum dos dois recebe ADR do harness,
+porque o bloco do `SubagentStart` é reduzido e a injeção por caminho só dispara em escrita.
+Por isso o revisor manda ler o mapa "Qual ADR ler" e os ADRs de cada arquivo do diff.
+
+O consultor é o destino da frase "Os outros N estão em…" do bloco do `SessionStart`: quando
+o digest de becos sai cortado, o bloco manda perguntar a ele. Roda no Haiku, e acertou 7 de
+7 perguntas com resposta conhecida no ValidaNI, a ~90 a 100 mil tokens cada, contados no
+subagente. Ele tem Bash porque nesta versão do Claude Code não existem as ferramentas Grep e
+Glob: sem o Bash, acertou 2 de 7.
 
 **`SessionEnd` não narra por default.** Ele só tenta o `claude -p` quando a variável de
 ambiente `CLAUDE_CODE_SESSIONEND_HOOKS_TIMEOUT_MS` está setada acima de ~21.000 (é a

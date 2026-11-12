@@ -134,7 +134,8 @@ src/harness_memoria/
 
 Fora de `src/`: `hooks/hooks.json` (registro dos hooks no plugin — 6 scripts, 7 registros:
 `session_start.py` atende `SessionStart` e `SubagentStart`), `skills/` (4 skills),
-`agents/` (1 agente, o revisor de ADR chamado sob demanda — 2026-11, ADR-0011),
+`agents/` (2 agentes chamados sob demanda: o revisor de ADR e o consultor da memória —
+2026-11, ADR-0011 e ADR-0012),
 `template/` (esqueleto de `docs/` + `harness.json` mínimo), `.github/workflows/ci.yml`
 (3 jobs) e `tests/` (364 casos em 2026-09-08).
 

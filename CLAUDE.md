@@ -35,14 +35,14 @@ desde `docs/adr/0001-auto-hospedagem.md`.
 | Caminho                                      | ADRs                         |
 | -------------------------------------------- | ---------------------------- |
 | `.claude/harness.json`                       | 0001, 0007                   |
-| `agents/`                                    | 0004, 0009, 0011             |
+| `agents/`                                    | 0004, 0009, 0011, 0012       |
 | `docs/adr/`                                  | 0001                         |
 | `docs/diario/`                               | 0001, 0005, 0006, 0008       |
 | `hooks/hooks.json`                           | 0002, 0003, 0004, 0007       |
 | `src/harness_memoria/hooks/session_end.py`   | 0002, 0007                   |
 | `src/harness_memoria/hooks/guardar.py`       | 0009, 0010                   |
 | `src/harness_memoria/hooks/reafirmar.py`     | 0003                         |
-| `src/harness_memoria/hooks/session_start.py` | 0004, 0006, 0008, 0009       |
+| `src/harness_memoria/hooks/session_start.py` | 0004, 0006, 0008, 0009, 0012 |
 | `src/harness_memoria/hooks/verificar.py`     | 0007                         |
 | `src/harness_memoria/sensores.py`            | 0007                         |
 | `src/harness_memoria/adr.py`                 | 0009, 0010                   |

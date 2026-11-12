@@ -1,4 +1,4 @@
-"""Contrato dos agentes que o plugin entrega em `agents/` (ADR-0011).
+"""Contrato dos agentes que o plugin entrega em `agents/` (ADR-0011, ADR-0012).
 
 Três fatos que nenhum outro teste confere e que falham em silêncio na sessão do usuário:
 
@@ -7,9 +7,9 @@ Três fatos que nenhum outro teste confere e que falham em silêncio na sessão 
   ignorado sem erro, e que agente de PLUGIN ignora `hooks`, `mcpServers`, `permissionMode` e
   `initialPrompt`. Um desses no frontmatter afirma uma proteção que não existe: é o "config
   que mente reprova" aplicado ao agente.
-* **O revisor só lê.** Agente de plugin não carrega `permissionMode` nem hook próprio, então
-  a lista `tools` é a única trava mecânica que sobra. Ferramenta de escrita nela desfaz a
-  premissa do ADR-0011.
+* **Os agentes só leem.** Agente de plugin não carrega `permissionMode` nem hook próprio,
+  então a lista `tools` é a única trava mecânica que sobra. Ferramenta de escrita nela
+  desfaz a premissa dos dois ADRs.
 * **O gate.** O agente é registrado em todo projeto onde o plugin está habilitado, inclusive
   nos que não têm `.claude/harness.json`. Quem garante que ele não age neles é o passo 0 do
   prompt, então o passo 0 não pode sumir numa edição.
@@ -97,19 +97,34 @@ def test_nenhum_campo_ignorado_ou_desconhecido(arquivo: Path):
     )
 
 
-def test_revisor_so_tem_ferramentas_de_leitura():
-    campos, _ = _frontmatter(RAIZ_DO_REPO / "agents" / "revisor-adr.md")
+@pytest.mark.parametrize("arquivo", AGENTES, ids=lambda p: p.stem)
+def test_so_tem_ferramentas_de_leitura(arquivo: Path):
+    """Os dois agentes do plugin só leem (ADR-0011, ADR-0012). Um agente que escreva vai
+    precisar de um ADR que diga por quê, e de mudar esta lista junto."""
+    campos, corpo = _frontmatter(arquivo)
     ferramentas = {f.strip() for f in campos.get("tools", "").split(",") if f.strip()}
     assert ferramentas, "sem `tools`, o agente herda todas — inclusive Write e Edit"
     assert ferramentas <= FERRAMENTAS_DE_LEITURA, (
         f"ferramenta fora da lista de leitura: {sorted(ferramentas - FERRAMENTAS_DE_LEITURA)}"
     )
+    if "Bash" in ferramentas:
+        # Para o Bash, "só lê" é só o prompt: agente de plugin não carrega hook nem
+        # `permissionMode` que o trave. Sumir o parágrafo é sumir a trava inteira.
+        assert "Você só lê" in corpo, f"{arquivo.name}: Bash sem o parágrafo que o restringe"
 
 
-def test_revisor_comeca_pelo_gate():
-    _, corpo = _frontmatter(RAIZ_DO_REPO / "agents" / "revisor-adr.md")
+@pytest.mark.parametrize("arquivo", AGENTES, ids=lambda p: p.stem)
+def test_comeca_pelo_gate(arquivo: Path):
+    _, corpo = _frontmatter(arquivo)
     secoes = corpo.split("\n## ")
     gate = next((s for s in secoes if s.startswith("0. Gate")), None)
-    assert gate is not None, "o passo 0 (gate) sumiu do prompt do revisor"
+    assert gate is not None, f"{arquivo.name}: o passo 0 (gate) sumiu do prompt"
     assert ".claude/harness.json" in gate
-    assert corpo.index("## 0. Gate") < corpo.index("## 1."), "o gate tem de vir antes do diff"
+    assert corpo.index("## 0. Gate") < corpo.index("## 1."), "o gate tem de vir antes de tudo"
+
+
+def test_o_hook_aponta_para_um_agente_que_existe():
+    """O bloco do `SessionStart` manda perguntar ao consultor pelo nome do arquivo dele."""
+    from harness_memoria.hooks import session_start as SS
+
+    assert (RAIZ_DO_REPO / "agents" / f"{SS.AGENTE_CONSULTOR}.md").is_file()
