@@ -132,8 +132,9 @@ src/harness_memoria/
 └── auditar/      (1.088) 20+ cheques genéricos + carregamento dos cheques do projeto
 ```
 
-Fora de `src/`: `hooks/hooks.json` (registro dos hooks no plugin — 6 scripts, 7 registros:
-`session_start.py` atende `SessionStart` e `SubagentStart`), `skills/` (4 skills),
+Fora de `src/`: `hooks/hooks.json` (registro dos hooks no plugin — `session_start.py` atende
+`SessionStart` e `SubagentStart`, e `avisar_becos.py` atende `UserPromptSubmit` desde
+2026-11, ADR-0013; a contagem vive só no teste e no job `manifestos`), `skills/` (4 skills),
 `agents/` (2 agentes chamados sob demanda: o revisor de ADR e o consultor da memória —
 2026-11, ADR-0011 e ADR-0012),
 `template/` (esqueleto de `docs/` + `harness.json` mínimo), `.github/workflows/ci.yml`
@@ -655,10 +656,10 @@ Três jobs de CI, cada um cobrindo uma classe distinta de regressão:
    seis hooks com `--autoteste`, mais a auditoria. Usa `python` puro, sem venv, que é como o
    Claude Code os executa: é este job que pega um import de terceiro entrando por engano —
    mas não pega a AUSÊNCIA do nome `python` no PATH, porque `actions/setup-python` sempre o
-   fabrica no runner (ver §6.1). Inclui um cheque explícito de **gate**: os seis hooks contra
-   um projeto sem `harness.json` não podem produzir saída nenhuma nem criar `docs/`.
+   fabrica no runner (ver §6.1). Inclui um cheque explícito de **gate**: todo hook, rodado
+   contra um projeto sem `harness.json`, não pode produzir saída nenhuma nem criar `docs/`.
 3. **`manifestos`** — valida coerência entre `plugin.json`, `marketplace.json` e `hooks.json`:
-   nomes batem, todo caminho de hook existe, são exatamente 7 registros, toda pasta de skill
+   nomes batem, todo caminho de hook existe, o número de registros é o que o teste espera, toda pasta de skill
    tem `SKILL.md`, e ninguém declarou `version`.
 
 O autoteste do `session_start` é o mais interessante: ele confere **fidelidade**, não que o

@@ -30,6 +30,7 @@ from conftest import escrever_config
 
 from harness_memoria import adr, diario
 from harness_memoria.config import carregar, invioaveis
+from harness_memoria.hooks import _comum as C
 from harness_memoria.hooks import session_start as SS
 
 #: `CLAUDE_PROJECT_DIR` tem PRIORIDADE sobre o `cwd` do evento em `config.raiz_projeto`.
@@ -763,7 +764,7 @@ CONSULTOR = "harness-memoria:consultor-memoria"
 
 def test_o_consultor_e_achado_ao_lado_do_hook():
     """No repositório (e no cache do plugin, que tem o mesmo layout) o agente está lá."""
-    assert SS.consultor_disponivel() == CONSULTOR
+    assert C.consultor_disponivel() == CONSULTOR
 
 
 def test_digest_cortado_aponta_para_o_consultor(tmp_path: Path):
@@ -794,7 +795,7 @@ def test_sem_o_agente_ao_lado_o_bloco_manda_procurar(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
     """Versão do plugin sem o agente: ponteiro para agente inexistente é pior que nenhum."""
-    monkeypatch.setattr(SS, "consultor_disponivel", lambda: None)
+    monkeypatch.setattr(C, "consultor_disponivel", lambda: None)
     raiz = corpus(tmp_path / "proj", adrs=10, becos=100)
     bloco = SS.montar(raiz, _cfg(raiz), "startup")
     assert "procure por esse título" in bloco

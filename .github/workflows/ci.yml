@@ -98,7 +98,7 @@ jobs:
       - name: Autoteste dos hooks + estado do formatar
         run: |
           set -euo pipefail
-          for h in session_start session_end reafirmar guardar formatar pre_compact verificar; do
+          for h in session_start session_end reafirmar guardar formatar pre_compact verificar avisar_becos; do
             echo "--- $h"
             python "src/harness_memoria/hooks/$h.py" --autoteste --projeto /tmp/proj
           done
@@ -109,7 +109,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/alheio && printf '# Outro projeto\n' > /tmp/alheio/CLAUDE.md
-          for h in session_start session_end reafirmar guardar formatar pre_compact verificar; do
+          for h in session_start session_end reafirmar guardar formatar pre_compact verificar avisar_becos; do
             saida=$(echo '{"cwd":"/tmp/alheio","tool_name":"Write","session_id":"s","reason":"clear","tool_input":{"file_path":"/tmp/alheio/.env"}}' \
               | python "src/harness_memoria/hooks/$h.py")
             if [ -n "$saida" ]; then echo "FALHA: $h produziu saída em projeto sem config: $saida"; exit 1; fi
@@ -170,13 +170,14 @@ jobs:
                           rel = arg.replace("${CLAUDE_PLUGIN_ROOT}/", "")
                           if not Path(rel).exists():
                               falhas.append(f"hooks.json ({evento}) aponta para `{rel}`, que não existe")
-          # 8: SubagentStart (reusa session_start.py, bloco reduzido) e PreCompact entraram na
-          # onda 4, e Stop (verificar.py, sensores — ADR-0007) em 2026-10. `alvos` conta
+          # 9: SubagentStart (reusa session_start.py, bloco reduzido) e PreCompact entraram na
+          # onda 4, Stop (verificar.py, sensores — ADR-0007) em 2026-10, e UserPromptSubmit
+          # (avisar_becos.py, aviso de beco — ADR-0013) em 2026-11. `alvos` conta
           # REGISTRO em hooks.json, não script distinto (session_start é referenciado duas
           # vezes). Este número e o de `tests/test_eventos_novos.py` são os únicos lugares
           # onde a contagem vive — a prosa diz "todo hook".
-          if alvos != 8:
-              falhas.append(f"esperava 8 hooks referenciados, achei {alvos}")
+          if alvos != 9:
+              falhas.append(f"esperava 9 hooks referenciados, achei {alvos}")
 
           for d in Path("skills").iterdir():
               if not (d / "SKILL.md").exists():

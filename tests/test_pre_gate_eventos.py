@@ -42,6 +42,15 @@ _EVENTOS = {
     "pre_compact.py": lambda raiz: json.dumps(
         {"hook_event_name": "PreCompact", "trigger": "auto", "cwd": str(raiz)}
     ),
+    # ADR-0013: roda a CADA pedido do humano, em todo projeto com o plugin habilitado.
+    "avisar_becos.py": lambda raiz: json.dumps(
+        {
+            "hook_event_name": "UserPromptSubmit",
+            "cwd": str(raiz),
+            "session_id": "s-1",
+            "prompt": "montar o modal dentro da sidebar",
+        }
+    ),
 }
 
 

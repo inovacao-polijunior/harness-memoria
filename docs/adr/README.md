@@ -25,6 +25,7 @@ tabela — então uma tabela desatualizada não engana o agente, mas reprova o b
 | [0010](0010-mapa-por-caminho-em-arquivo-proprio.md) | Deixar o mapa por caminho morar num arquivo próprio, apontado pelo CLAUDE.md | implemented |
 | [0011](0011-revisor-de-adr-como-agente-do-plugin.md) | Revisar a aderência a ADR com um agente do plugin, chamado sob demanda   | proposed    |
 | [0012](0012-consultor-da-memoria-como-agente-do-plugin.md) | Consultar os becos e ADRs que o bloco corta com um agente do plugin, apontado pelo `SessionStart` | proposed    |
+| [0013](0013-avisar-no-pedido-o-beco-que-ele-toca.md) | Avisar, no envio do pedido, o beco que ele parece tocar, e mandar chamar o consultor | proposed    |
 
 ## Status
 
@@ -49,11 +50,11 @@ Supersessão é **bidirecional**: o novo declara `substitui:`, o antigo declara
      o mesmo peso. A auditoria verifica. -->
 
 - **Harness (auto-hospedagem):** 0001
-- **Hooks de sessão:** 0002, 0004, 0006, 0008, 0009, 0010, 0012
+- **Hooks de sessão:** 0002, 0004, 0006, 0008, 0009, 0010, 0012, 0013
 - **Reafirmação:** 0003
 - **Auditoria:** 0005
 - **Sensores (verificação no loop):** 0007
-- **Agentes do plugin:** 0011, 0012
+- **Agentes do plugin:** 0011, 0012, 0013
 
 ## Regras
 

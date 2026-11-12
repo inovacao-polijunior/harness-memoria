@@ -146,6 +146,7 @@ injeta no contexto — três como `additionalContext` e o `pre_compact` como
 | `reafirmar`     | a cada 15 escritas       | 550 ch no CLAUDE.md deste repositório, 5 invioláveis (~37 ch/escrita amortizados) |
 | `guardar`       | a cada bloqueio          | 133 ch na guarda universal de `.env`                  |
 | `pre_compact`   | toda compactação (`manual`/`auto`) | 452 ch neste repositório (5 invioláveis) e 170 ch no consumidor sintético (1) — vira `customInstructions` do sumarizador, não `additionalContext` |
+| `avisar_becos`  | pedido que parece tocar um beco (ADR-0013: na medição, 9 de 121 pedidos reais), uma vez por beco por sessão | 541–555 ch nos três pedidos de teste do ValidaNI |
 
 Meça o seu projeto com os dois comandos que a fidelidade confere:
 
@@ -246,6 +247,7 @@ Os registros de `hooks/hooks.json` (`session_start.py` atende dois eventos):
 | --------------- | --------------------------- | ------------------------------------------------------------------- |
 | `session_start` | SessionStart                | injeta a última entrada **narrada** do diário (registros automáticos posteriores viram uma linha cada), digest de becos, índice de ADR e, se houver, o aviso de rotação pendente — orçado para caber em 10.000 ch (ver acima) |
 | `session_start` | SubagentStart                | injeta o bloco REDUZIDO (invioláveis + digest de becos, teto 6.000 ch) para o subagente que nunca leu a sessão principal |
+| `avisar_becos`  | UserPromptSubmit            | busca por texto, em todos os becos do diário, o que o pedido parece tocar; quando passa da regra, injeta o beco junto do pedido e manda chamar o consultor da memória (ADR-0013). Mede ~39 ms por pedido num diário de 340 becos |
 | `pre_compact`   | PreCompact                  | instrui o sumarizador a preservar invioláveis e IDs de ADR ANTES da compactação — stdout cru, custo de contexto ZERO |
 | `session_end`   | SessionEnd                  | grava o **piso determinístico** da sessão (arquivos, comandos, falhas observadas — comando que falhou, guarda ou permissão que negou —, diffstat, ADRs tocados); narrativa por `claude -p` é **opt-in** (ver abaixo) |
 | `reafirmar`     | PostToolUse (`async`)       | reafirma as invioláveis a cada N escritas                            |

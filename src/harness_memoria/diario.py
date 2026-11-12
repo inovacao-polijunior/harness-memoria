@@ -652,39 +652,55 @@ def recortar_entrada(corpo: str, cfg: ConfigDiario, arquivo: str = "") -> str:
     return montar(manter, "")[: max(0, espaco)].rstrip() + marca + nota
 
 
-def becos_sem_saida(pasta: Path, cfg: ConfigDiario) -> tuple[list[str], int]:
-    """Becos já explorados, do mais recente para o mais antigo, e o total encontrado.
+@dataclass(frozen=True)
+class Beco:
+    """Um item de `### Tentativas descartadas`, com o lugar de onde veio (ADR-0013)."""
 
-    Derivado das seções `### Tentativas descartadas` de TODO o diário, inclusive de
-    `arquivo/`. Deliberadamente **não** gera arquivo: um artefato derivado com o mesmo
-    texto do diário seria duplicação — a fonte continua única, isto é só uma segunda
-    leitura dela.
+    arquivo: Path  # arquivo do diário onde o item está
+    linha: int  # linha (1-based) do "- " que abre o item
+    data: str  # "AAAA-MM-DD" da entrada, ou ""
+    texto: str  # o item sem o "- ", com espaços colapsados
 
-    Existe porque o `SessionStart` injetava UMA entrada, e no projeto de origem essa seção
-    acumulou 77 itens em 17 entradas: 76 deles inalcançáveis sem alguém decidir abrir três
-    arquivos. Medido lá: a mesma classe de erro reincidiu ao menos três vezes.
 
-    Quem chama é responsável por anunciar a diferença entre os dois números.
+_SECAO_DE_BECOS = re.compile(
+    rf"^### {re.escape(SECAO_BECOS)}\s*\n(.*?)(?=^### |\Z)", re.MULTILINE | re.DOTALL
+)
+
+
+def becos_com_origem(pasta: Path) -> list[Beco]:
+    """Todo beco do diário, do mais recente para o mais antigo, com arquivo e linha.
+
+    O único parser das seções de becos: o digest do `SessionStart` (`becos_sem_saida`) e o
+    aviso do `UserPromptSubmit` (ADR-0013) leem daqui, porque dois parsers do mesmo formato
+    divergiriam na primeira correção. A ordem é a de sempre: arquivos na ordem de
+    `arquivos_do_diario`, entradas do fim para o começo de cada arquivo, itens na ordem da
+    seção.
+
+    Arquivo ilegível é pulado, inclusive o de UTF-8 inválido: `UnicodeDecodeError` é
+    `ValueError`, não `OSError`, e um byte ruim num mês arquivado derrubava a leitura do
+    diário inteiro, com o bloco do `SessionStart` junto.
     """
-    itens: list[str] = []
+    becos: list[Beco] = []
     vistos: set[str] = set()
-    padrao_secao = re.compile(
-        rf"^### {re.escape(SECAO_BECOS)}\s*\n(.*?)(?=^### |\Z)", re.MULTILINE | re.DOTALL
-    )
-
     for p in arquivos_do_diario(pasta):
         try:
             texto = p.read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             continue
+        inicios = [m.start() for m in _FRONTEIRA_ENTRADA.finditer(texto)]
         # entradas vêm em ordem cronológica no arquivo; queremos a mais recente antes
-        for bloco in reversed(_FRONTEIRA_ENTRADA.split(texto)[1:]):
+        for i in reversed(range(len(inicios))):
+            fim = inicios[i + 1] if i + 1 < len(inicios) else len(texto)
+            bloco = texto[inicios[i] : fim]
             achou_data = _DATA_DA_ENTRADA.match(bloco)
             data = achou_data.group(1) if achou_data else ""
-            secao = padrao_secao.search(bloco)
+            secao = _SECAO_DE_BECOS.search(bloco)
             if not secao:
                 continue
-            for cru in re.split(r"^- ", secao.group(1), flags=re.MULTILINE)[1:]:
+            corpo = secao.group(1)
+            tracos = [m.start() for m in re.finditer(r"^- ", corpo, flags=re.MULTILINE)]
+            for j, ini in enumerate(tracos):
+                cru = corpo[ini + 2 : tracos[j + 1] if j + 1 < len(tracos) else len(corpo)]
                 item = " ".join(cru.split())
                 if not item:
                     continue
@@ -701,9 +717,30 @@ def becos_sem_saida(pasta: Path, cfg: ConfigDiario) -> tuple[list[str], int]:
                 if chave in vistos:
                     continue
                 vistos.add(chave)
-                prefixo = f"{data} · " if data else ""
-                itens.append(prefixo + _resumir_beco(item, cfg.teto_item_beco_chars))
+                absoluto = inicios[i] + secao.start(1) + ini
+                linha = texto.count("\n", 0, absoluto) + 1
+                becos.append(Beco(arquivo=p, linha=linha, data=data, texto=item))
+    return becos
 
+
+def becos_sem_saida(pasta: Path, cfg: ConfigDiario) -> tuple[list[str], int]:
+    """Becos já explorados, do mais recente para o mais antigo, e o total encontrado.
+
+    Derivado das seções `### Tentativas descartadas` de TODO o diário, inclusive de
+    `arquivo/`. Deliberadamente **não** gera arquivo: um artefato derivado com o mesmo
+    texto do diário seria duplicação — a fonte continua única, isto é só uma segunda
+    leitura dela.
+
+    Existe porque o `SessionStart` injetava UMA entrada, e no projeto de origem essa seção
+    acumulou 77 itens em 17 entradas: 76 deles inalcançáveis sem alguém decidir abrir três
+    arquivos. Medido lá: a mesma classe de erro reincidiu ao menos três vezes.
+
+    Quem chama é responsável por anunciar a diferença entre os dois números.
+    """
+    itens = [
+        (f"{b.data} · " if b.data else "") + _resumir_beco(b.texto, cfg.teto_item_beco_chars)
+        for b in becos_com_origem(pasta)
+    ]
     dentro: list[str] = []
     gasto = 0
     for item in itens:

@@ -38,13 +38,15 @@ desde `docs/adr/0001-auto-hospedagem.md`.
 | `agents/`                                    | 0004, 0009, 0011, 0012       |
 | `docs/adr/`                                  | 0001                         |
 | `docs/diario/`                               | 0001, 0005, 0006, 0008       |
-| `hooks/hooks.json`                           | 0002, 0003, 0004, 0007       |
+| `hooks/hooks.json`                           | 0002, 0003, 0004, 0007, 0013 |
 | `src/harness_memoria/hooks/session_end.py`   | 0002, 0007                   |
 | `src/harness_memoria/hooks/guardar.py`       | 0009, 0010                   |
 | `src/harness_memoria/hooks/reafirmar.py`     | 0003                         |
-| `src/harness_memoria/hooks/session_start.py` | 0004, 0006, 0008, 0009, 0012 |
+| `src/harness_memoria/hooks/session_start.py` | 0004, 0006, 0008, 0009, 0012, 0013 |
+| `src/harness_memoria/hooks/avisar_becos.py`  | 0013                         |
+| `src/harness_memoria/busca.py`               | 0013                         |
 | `src/harness_memoria/hooks/verificar.py`     | 0007                         |
 | `src/harness_memoria/sensores.py`            | 0007                         |
 | `src/harness_memoria/adr.py`                 | 0009, 0010                   |
-| `src/harness_memoria/diario.py`              | 0002, 0005, 0006, 0007, 0008 |
+| `src/harness_memoria/diario.py`              | 0002, 0005, 0006, 0007, 0008, 0013 |
 | `src/harness_memoria/auditar/`               | 0005, 0007, 0009, 0010       |

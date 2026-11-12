@@ -57,11 +57,9 @@ try:
     if __name__ == "__main__" and "--autoteste" not in sys.argv and L.gate_barato() is False:
         L.sair_sem_fazer_nada()
 
-    import json  # noqa: E402
     import re  # noqa: E402
     from dataclasses import replace  # noqa: E402
     from datetime import datetime  # noqa: E402
-    from functools import cache  # noqa: E402
     from pathlib import Path  # noqa: E402
 
     from harness_memoria import adr, diario  # noqa: E402
@@ -137,10 +135,6 @@ MAX_AUTOMATICAS_NO_BLOCO = 5
 ANUNCIO_DE_AUTOMATICAS = "registro(s) automático(s)"
 ANUNCIO_DE_ROTACAO = "Rotação do diário pendente"
 
-#: O agente que procura nos becos que o digest deixou de fora (ADR-0012), pelo nome do
-#: arquivo em `agents/`. O nome qualificado (`plugin:agente`) vem do manifesto do plugin.
-AGENTE_CONSULTOR = "consultor-memoria"
-
 
 def main(argv: list[str] | None = None) -> int:
     if _ERRO_DE_BOOTSTRAP is not None:
@@ -192,8 +186,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # O resumo da compactação não leva os ADRs que o `PreToolUse` entregou por caminho
     # (ADR-0009): sem esquecer, a sessão compactada nunca mais os receberia.
+    # Pelo mesmo motivo, os becos já avisados no `UserPromptSubmit` (ADR-0013) voltam.
     if evento.get("source") == "compact" and evento.get("session_id"):
         C.esquecer_adrs_vistos(raiz, str(evento["session_id"]))
+        C.esquecer_becos_avisados(raiz, str(evento["session_id"]))
 
     contexto_texto = montar(raiz, cfg, str(evento.get("source") or "startup"), reduzido=reduzido)
     if not contexto_texto:
@@ -507,26 +503,6 @@ def _prosa_de_becos(cfg: Config, reduzido: bool) -> int:
     return len(_moldar_becos(cfg, ["x"], 9999, reduzido)) - len("- x")
 
 
-@cache
-def consultor_disponivel() -> str | None:
-    """O nome qualificado do consultor da memória, ou `None` se ele não veio com este hook.
-
-    O ponteiro só entra no bloco quando o arquivo do agente está no MESMO plugin que roda
-    este hook: o hook e o agente saem no mesmo commit, então quem tem um tem o outro, e uma
-    versão sem o agente continua mandando procurar à mão. Ponteiro para um agente que não
-    existe é pior que ponteiro nenhum: a sessão perderia a chamada e o "procure" junto.
-    """
-    try:
-        raiz_do_plugin = Path(__file__).resolve().parents[3]
-        if not (raiz_do_plugin / "agents" / f"{AGENTE_CONSULTOR}.md").is_file():
-            return None
-        manifesto = raiz_do_plugin / ".claude-plugin" / "plugin.json"
-        nome = json.loads(manifesto.read_text(encoding="utf-8"))["name"]
-    except (OSError, ValueError, KeyError, TypeError, IndexError):
-        return None
-    return f"{nome}:{AGENTE_CONSULTOR}" if isinstance(nome, str) and nome else None
-
-
 def _moldar_becos(cfg: Config, becos: list[str], total: int, reduzido: bool) -> str:
     if not becos:
         return ""
@@ -537,7 +513,7 @@ def _moldar_becos(cfg: Config, becos: list[str], total: int, reduzido: bool) -> 
     )
     # O bloco reduzido continua mandando procurar: ele vai para um subagente, e subagente
     # não chama subagente.
-    consultor = None if reduzido else consultor_disponivel()
+    consultor = None if reduzido else C.consultor_disponivel()
     if faltam <= 0:
         resto = ""
     elif consultor:

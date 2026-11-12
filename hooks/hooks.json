@@ -29,6 +29,20 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/avisar_becos.py"],
+            "timeout": 5,
+            "statusMessage": "Procurando becos do pedido"
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "matcher": "manual|auto",

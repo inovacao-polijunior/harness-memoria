@@ -125,6 +125,6 @@ def test_comeca_pelo_gate(arquivo: Path):
 
 def test_o_hook_aponta_para_um_agente_que_existe():
     """O bloco do `SessionStart` manda perguntar ao consultor pelo nome do arquivo dele."""
-    from harness_memoria.hooks import session_start as SS
+    from harness_memoria.hooks import _comum as C
 
-    assert (RAIZ_DO_REPO / "agents" / f"{SS.AGENTE_CONSULTOR}.md").is_file()
+    assert (RAIZ_DO_REPO / "agents" / f"{C.AGENTE_CONSULTOR}.md").is_file()

@@ -201,15 +201,28 @@ def _alvos(hk: dict) -> list[tuple[str, str, dict]]:
 
 
 def test_numero_de_alvos_bate_com_o_que_o_ci_espera():
-    """Mesma conta do job `manifestos` (`.github/workflows/ci.yml`, `if alvos != 8`).
+    """Mesma conta do job `manifestos` (`.github/workflows/ci.yml`, `if alvos != 9`).
 
     5 (linha de base) + 1 (`PreCompact`, mudança 10.1) + 1 (`SubagentStart`, mudança 10.2,
     reusa `session_start.py` — não é arquivo novo) + 1 (`Stop` → `verificar.py`, ADR-0007)
-    = 8. Este teste e o job são os ÚNICOS lugares onde o número vive; a prosa diz "todo
-    hook", porque número escrito em prosa envelhece no hook seguinte.
+    + 1 (`UserPromptSubmit` → `avisar_becos.py`, ADR-0013) = 9. Este teste e o job são os
+    ÚNICOS lugares onde o número vive; a prosa diz "todo hook", porque número escrito em
+    prosa envelhece no hook seguinte.
     """
     alvos = _alvos(_hooks_json())
-    assert len(alvos) == 8, alvos
+    assert len(alvos) == 9, alvos
+
+
+def test_user_prompt_submit_aponta_para_avisar_becos_sincrono():
+    """ADR-0013: o aviso tem de chegar ANTES de o Claude ler o pedido, então o hook não
+    pode ser `async` — saída de hook assíncrono só entra no turno seguinte."""
+    hk = _hooks_json()
+    entradas = hk["hooks"].get("UserPromptSubmit")
+    assert entradas, "UserPromptSubmit não registrado"
+    (h,) = [h for e in entradas for h in e["hooks"]]
+    assert h["args"] == ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/avisar_becos.py"]
+    assert h["timeout"] == 5
+    assert "async" not in h
 
 
 def test_precompact_aponta_para_o_script_novo_com_o_matcher_de_trigger():

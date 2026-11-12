@@ -13,6 +13,7 @@ import os
 import re
 import sys
 import time
+from functools import cache
 from pathlib import Path
 
 from ..config import Config, ErroDeConfig, carregar, raiz_projeto
@@ -53,7 +54,13 @@ def ler_evento(padrao: dict | None = None) -> dict:
     if padrao is not None:
         return padrao
     try:
-        bruto = sys.stdin.read()
+        # Bytes decodificados como UTF-8, e não `sys.stdin.read()`: no Windows o stdin abre
+        # na codificação local (cp1252), e o Claude Code manda o JSON em UTF-8 sem escapar.
+        # Um "Á" (C3 81) derrubava o hook com UnicodeDecodeError, porque 0x81 não existe em
+        # cp1252, e o resto saía embaralhado (ADR-0013: o pedido é texto livre em pt-BR).
+        # Sem `buffer` (stdin trocado por um StringIO), o texto já vem decodificado.
+        buffer = getattr(sys.stdin, "buffer", None)
+        bruto = buffer.read().decode("utf-8", "replace") if buffer else sys.stdin.read()
         return json.loads(bruto) if bruto.strip() else {}
     except (OSError, json.JSONDecodeError):
         return {}
@@ -83,6 +90,32 @@ def contexto(evento: dict, rotulo: str) -> tuple[Path, Config] | None:
 def narrando() -> bool:
     """True dentro do `claude -p` que escreve o diário."""
     return os.environ.get(VAR_GUARDA) == "1"
+
+
+#: O agente que procura nos becos e ADRs que o bloco injetado não mostra (ADR-0012), pelo
+#: nome do arquivo em `agents/`. O nome qualificado (`plugin:agente`) vem do manifesto.
+AGENTE_CONSULTOR = "consultor-memoria"
+
+
+@cache
+def consultor_disponivel() -> str | None:
+    """O nome qualificado do consultor da memória, ou `None` se ele não veio com este hook.
+
+    Usada pelo bloco do `SessionStart` (ADR-0012) e pelo aviso do `UserPromptSubmit`
+    (ADR-0013). O ponteiro só sai quando o arquivo do agente está no MESMO plugin que roda o
+    hook: o hook e o agente saem no mesmo commit, então quem tem um tem o outro. Ponteiro
+    para um agente que não existe é pior que ponteiro nenhum. `parents[3]` é a raiz do
+    plugin porque este arquivo mora em `src/harness_memoria/hooks/`.
+    """
+    try:
+        raiz_do_plugin = Path(__file__).resolve().parents[3]
+        if not (raiz_do_plugin / "agents" / f"{AGENTE_CONSULTOR}.md").is_file():
+            return None
+        manifesto = raiz_do_plugin / ".claude-plugin" / "plugin.json"
+        nome = json.loads(manifesto.read_text(encoding="utf-8"))["name"]
+    except (OSError, ValueError, KeyError, TypeError, IndexError):
+        return None
+    return f"{nome}:{AGENTE_CONSULTOR}" if isinstance(nome, str) and nome else None
 
 
 def emitir_contexto(evento_nome: str, texto: str) -> None:
@@ -167,7 +200,39 @@ _ESTADO_QUE_EXPIRA: dict[str, int] = {
     "escritas_*.txt": VALIDADE_ESTADO_DIAS,
     "sensores_*.json": VALIDADE_ESTADO_DIAS,
     "adrs_vistos_*.txt": VALIDADE_ESTADO_DIAS,
+    "becos_avisados_*.txt": VALIDADE_ESTADO_DIAS,
 }
+
+
+def _caminho_becos_avisados(raiz: Path, sessao: str) -> Path:
+    seguro = re.sub(r"[^A-Za-z0-9_-]", "_", sessao)[:64]
+    return pasta_estado(raiz) / f"becos_avisados_{seguro}.txt"
+
+
+def ler_becos_avisados(raiz: Path, sessao: str) -> set[str]:
+    """Chaves `arquivo:linha` dos becos já avisados nesta sessão (ADR-0013). Nunca lança."""
+    try:
+        texto = _caminho_becos_avisados(raiz, sessao).read_text(encoding="utf-8")
+        return set(texto.splitlines()) - {""}
+    except OSError:
+        return set()
+
+
+def marcar_beco_avisado(raiz: Path, sessao: str, chave: str) -> None:
+    """Sem estado, o aviso pode se repetir na sessão, e só isso: nunca atrapalha o pedido."""
+    try:
+        pasta = pasta_estado(raiz)
+        _limpar_estado_velho(pasta)
+        with _caminho_becos_avisados(raiz, sessao).open("a", encoding="utf-8") as f:
+            f.write(f"{chave}\n")
+    except OSError:
+        pass
+
+
+def esquecer_becos_avisados(raiz: Path, sessao: str) -> None:
+    """Na compactação: o resumo não leva o aviso, então o beco pode voltar."""
+    with contextlib.suppress(OSError):
+        _caminho_becos_avisados(raiz, sessao).unlink(missing_ok=True)
 
 
 def _caminho_adrs_vistos(raiz: Path, sessao: str, agente: str = "") -> Path:
