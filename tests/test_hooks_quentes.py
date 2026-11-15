@@ -843,3 +843,78 @@ def test_autoteste_de_formatar_declara_o_estado_de_cada_regra(projeto: Path):
     assert "ausente no PATH" in r.stdout, r.stdout
     assert "exigência ausente" in r.stdout, r.stdout
     assert ": ok" in r.stdout, r.stdout
+
+
+# --------------------------------------------------------------------------- #
+# Reafirmação dentro do `guardar` (ADR-0014): um interpretador por escrita, não três
+# --------------------------------------------------------------------------- #
+
+
+def _pre(raiz: Path, sessao: str, ferramenta: str = "Write", **entrada: str) -> str:
+    return json.dumps(
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": ferramenta,
+            "session_id": sessao,
+            "cwd": str(raiz),
+            "tool_input": entrada,
+        }
+    )
+
+
+def _contexto(r) -> str:
+    assert r.returncode == 0, r.stderr
+    if not r.stdout.strip():
+        return ""
+    return json.loads(r.stdout)["hookSpecificOutput"].get("additionalContext", "")
+
+
+def test_guardar_reafirma_na_escrita_que_completa_o_intervalo(projeto: Path):
+    """O que o `PostToolUse` `reafirmar` fazia, no mesmo processo da guarda: o mesmo
+    contador, o mesmo intervalo e o mesmo texto."""
+    escrever_config(projeto, {"reafirmacao": {"intervalo_escritas": 2}})
+    alvo = str(projeto / "README.md")
+    primeira = _rodar(HOOKS / "guardar.py", _pre(projeto, "s-reaf", file_path=alvo), projeto)
+    assert _contexto(primeira) == ""
+    segunda = _rodar(HOOKS / "guardar.py", _pre(projeto, "s-reaf", file_path=alvo), projeto)
+    texto = _contexto(segunda)
+    assert "Reafirmação automática do harness — 2 escritas" in texto
+    assert "Escrever segredo no repositório" in texto
+
+
+def test_guardar_nao_conta_escrita_negada_nem_bash(projeto: Path):
+    """O `PostToolUse` só via escrita concluída; aqui a negada sai antes do contador, e o
+    Bash nunca contou."""
+    escrever_config(projeto, {"reafirmacao": {"intervalo_escritas": 1}})
+    negada = _rodar(
+        HOOKS / "guardar.py", _pre(projeto, "s-neg", file_path=str(projeto / ".env")), projeto
+    )
+    assert json.loads(negada.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert "additionalContext" not in negada.stdout
+    bash = _rodar(HOOKS / "guardar.py", _pre(projeto, "s-neg", "Bash", command="ls"), projeto)
+    assert _contexto(bash) == ""
+    ok = _rodar(
+        HOOKS / "guardar.py", _pre(projeto, "s-neg", file_path=str(projeto / "README.md")), projeto
+    )
+    assert "— 1 escritas nesta sessão" in _contexto(ok)
+
+
+def test_guardar_junta_adr_do_caminho_e_reafirmacao_num_unico_json(projeto: Path):
+    """Dois `print` de JSON seguidos seriam um stdout que o Claude Code não lê."""
+    escrever_config(projeto, {"reafirmacao": {"intervalo_escritas": 1}})
+    alvo = str(projeto / "scripts" / "novo.py")
+    r = _rodar(HOOKS / "guardar.py", _pre(projeto, "s-junta", file_path=alvo), projeto)
+    texto = _contexto(r)  # `json.loads` do stdout inteiro: falha se houver dois objetos
+    assert "ADR-0001" in texto
+    assert "Reafirmação automática" in texto
+
+
+def test_guardar_nao_reafirma_no_narrador(projeto: Path):
+    escrever_config(projeto, {"reafirmacao": {"intervalo_escritas": 1}})
+    r = _rodar(
+        HOOKS / "guardar.py",
+        _pre(projeto, "s-narr", file_path=str(projeto / "README.md")),
+        projeto,
+        env_extra={"HARNESS_MEMORIA_NARRANDO": "1"},
+    )
+    assert "Reafirmação" not in _contexto(r)

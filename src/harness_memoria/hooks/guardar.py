@@ -211,12 +211,40 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
         return 0
-    if ferramenta in FERRAMENTAS_DE_ESCRITA and cfg.adr.injetar_por_caminho:
-        _entregar_adrs_do_caminho(raiz, cfg, evento)
+    if ferramenta not in FERRAMENTAS_DE_ESCRITA:
+        return 0
+    # Os dois textos saem num ÚNICO JSON: o Claude Code lê um objeto por saída de hook, e
+    # dois `print` seguidos seriam um stdout que não é JSON válido.
+    partes = []
+    if cfg.adr.injetar_por_caminho:
+        partes.append(_adrs_do_caminho(raiz, cfg, evento))
+    partes.append(_reafirmacao(raiz, cfg, evento))
+    texto = "\n\n".join(p for p in partes if p)
+    if texto:
+        C.emitir_contexto("PreToolUse", texto)
     return 0
 
 
-def _entregar_adrs_do_caminho(raiz, cfg: Config, evento: dict) -> None:
+def _reafirmacao(raiz, cfg: Config, evento: dict) -> str:
+    """ADR-0014: a reafirmação das invioláveis, que era um hook `PostToolUse` próprio.
+
+    Mora neste processo pelo mesmo motivo do ADR por caminho: este hook já roda em toda
+    escrita, e um segundo interpretador por escrita só para incrementar um contador era o
+    custo que o ADR-0014 corta. Conta só escrita LIBERADA — `main` sai antes de chegar aqui
+    quando a guarda nega —, como o `PostToolUse` contava só escrita concluída. Mesmo
+    contador, mesmo intervalo e mesmo texto de `reafirmar.montar_mensagem`.
+    """
+    if C.narrando() or not cfg.reafirmacao.habilitado:
+        return ""
+    contagem = C.incrementar_contador(raiz, str(evento.get("session_id") or "sem-sessao"))
+    if contagem <= 0 or contagem % cfg.reafirmacao.intervalo_escritas != 0:
+        return ""
+    from harness_memoria.hooks.reafirmar import montar_mensagem
+
+    return montar_mensagem(raiz, cfg, contagem)
+
+
+def _adrs_do_caminho(raiz, cfg: Config, evento: dict) -> str:
     """ADR-0009: os ADRs que o mapa "Qual ADR ler" aponta para o arquivo desta escrita.
 
     Mora neste processo, e não num hook próprio, porque este já roda síncrono em toda
@@ -232,18 +260,18 @@ def _entregar_adrs_do_caminho(raiz, cfg: Config, evento: dict) -> None:
         entrada.get("file_path") or entrada.get("notebook_path")
     )
     if not isinstance(caminho, str) or not caminho:
-        return
+        return ""
     try:
         rel = os.path.relpath(os.path.realpath(caminho), os.path.realpath(raiz))
     except ValueError:  # outro drive, no Windows
-        return
+        return ""
     rel = posixpath.normpath(rel.replace("\\", "/"))
     if rel == ".." or rel.startswith("../"):
-        return
+        return ""
     mapa, _ = adr.ler_mapa(raiz)
     nums = adr.adrs_do_caminho(mapa or [], rel, raiz)
     if not nums:
-        return
+        return ""
     sessao = str(evento.get("session_id") or "sem-sessao")
     agente = str(evento.get("agent_id") or "")
     vistos = C.ler_adrs_vistos(raiz, sessao, agente)
@@ -251,8 +279,8 @@ def _entregar_adrs_do_caminho(raiz, cfg: Config, evento: dict) -> None:
         raiz, cfg.pasta_adr, [n for n in nums if n not in vistos], rel
     )
     if texto:
-        C.emitir_contexto("PreToolUse", texto)
         C.marcar_adrs_vistos(raiz, sessao, agente, mostrados)
+    return texto or ""
 
 
 def avaliar(ferramenta: str, entrada: dict, g: ConfigGuardas) -> str | None:

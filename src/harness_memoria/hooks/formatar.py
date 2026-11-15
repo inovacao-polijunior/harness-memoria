@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Hook PostToolUse — formata o arquivo recém-editado, se o formatador existir.
+"""Formata um arquivo com os formatadores do `harness.json`, se o formatador existir.
+
+Desde o ADR-0014 este arquivo NÃO é registrado no `hooks.json`: o `verificar` (Stop) chama
+`_talvez_formatar` sobre o que o turno escreveu. O `main` (evento de escrita no stdin) e o
+autoteste ficam para rodar à mão.
 
 Deliberadamente silencioso e tolerante: numa máquina sem as dependências instaladas o hook
 não faz nada e não reclama. Formatação é responsabilidade do formatador, não do CLAUDE.md —
@@ -110,7 +114,7 @@ def _executavel(nome: str) -> str | None:
     return shutil.which(nome)
 
 
-def _talvez_formatar(regra: dict, arquivo: Path, raiz: Path) -> None:
+def _talvez_formatar(regra: dict, arquivo: Path, raiz: Path, timeout: float = TIMEOUT_S) -> None:
     extensoes = tuple(str(e).lower() for e in (regra.get("extensoes") or ()))
     if arquivo.suffix.lower() not in extensoes:
         return
@@ -141,7 +145,7 @@ def _talvez_formatar(regra: dict, arquivo: Path, raiz: Path) -> None:
             args,
             capture_output=True,
             text=True,
-            timeout=TIMEOUT_S,
+            timeout=min(timeout, TIMEOUT_S),
             cwd=str(cwd) if cwd.exists() else None,
         )
 

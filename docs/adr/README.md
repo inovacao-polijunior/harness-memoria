@@ -15,7 +15,7 @@ tabela — então uma tabela desatualizada não engana o agente, mas reprova o b
 | -------------------------------------------------- | ------------------------------------------------------------------------- | ----------- |
 | [0001](0001-auto-hospedagem.md)                     | Auto-hospedar o harness de memória neste repositório                      | accepted    |
 | [0002](0002-piso-deterministico-no-session-end.md)  | Gravar o piso determinístico no SessionEnd e deixar a narrativa opt-in    | implemented |
-| [0003](0003-reafirmacao-async.md)                   | Rodar a reafirmação intra-sessão como hook async                          | implemented |
+| [0003](0003-reafirmacao-async.md)                   | Rodar a reafirmação intra-sessão como hook async                          | superseded  |
 | [0004](0004-orcamento-do-contexto-injetado.md)      | Orçar o bloco injetado pelo teto de 10.000 ch; SubagentStart reduzido     | implemented |
 | [0005](0005-auditor-corrige-o-mecanico.md)          | Deixar o auditor corrigir o que é mecânico (`--corrigir`)                 | implemented |
 | [0006](0006-reinjetar-a-ultima-entrada-narrada.md)  | Reinjetar a última entrada NARRADA e só resumir os registros automáticos  | implemented |
@@ -26,6 +26,7 @@ tabela — então uma tabela desatualizada não engana o agente, mas reprova o b
 | [0011](0011-revisor-de-adr-como-agente-do-plugin.md) | Revisar a aderência a ADR com um agente do plugin, chamado sob demanda   | proposed    |
 | [0012](0012-consultor-da-memoria-como-agente-do-plugin.md) | Consultar os becos e ADRs que o bloco corta com um agente do plugin, apontado pelo `SessionStart` | proposed    |
 | [0013](0013-avisar-no-pedido-o-beco-que-ele-toca.md) | Avisar, no envio do pedido, o beco que ele parece tocar, e mandar chamar o consultor | proposed    |
+| [0014](0014-um-interpretador-por-chamada-de-ferramenta.md) | Rodar um só interpretador por chamada de ferramenta: reafirmação no `guardar`, formatação no `Stop` | proposed    |
 
 ## Status
 
@@ -51,9 +52,9 @@ Supersessão é **bidirecional**: o novo declara `substitui:`, o antigo declara
 
 - **Harness (auto-hospedagem):** 0001
 - **Hooks de sessão:** 0002, 0004, 0006, 0008, 0009, 0010, 0012, 0013
-- **Reafirmação:** 0003
+- **Reafirmação:** 0003 (superada → 0014), 0014
 - **Auditoria:** 0005
-- **Sensores (verificação no loop):** 0007
+- **Sensores (verificação no loop):** 0007, 0014
 - **Agentes do plugin:** 0011, 0012, 0013
 
 ## Regras

@@ -87,6 +87,17 @@ def arquivos_do_turno(transcript: str | None, raiz: Path) -> tuple[list[str], fl
     sem saber quando o turno começou, qualquer arquivo sujo do worktree contaria, e o
     sensor passaria a cobrar do agente o que outra sessão deixou.
     """
+    escritos, inicio = escritas_do_transcript(transcript)
+    return somar_sujos(raiz, escritos, inicio), inicio
+
+
+def escritas_do_transcript(transcript: str | None) -> tuple[list[str], float | None]:
+    """Só a metade do transcript de `arquivos_do_turno`: `Write`/`Edit`/… do turno, sem o git.
+
+    A formatação do `Stop` (ADR-0014) usa só esta lista: arquivo que o git viu mudar pode ser
+    lockfile de `npm install` ou edição do usuário no editor, e formatador não tem nada que
+    reescrever o que o agente não escreveu.
+    """
     if not transcript:
         return [], None
     p = Path(transcript)
@@ -114,11 +125,17 @@ def arquivos_do_turno(transcript: str | None, raiz: Path) -> tuple[list[str], fl
                         escritos.append(alvo)
     except OSError:
         return [], None
+    return escritos, inicio
+
+
+def somar_sujos(raiz: Path, escritos: list[str], inicio: float | None) -> list[str]:
+    """`escritos` mais o que o git viu mudar desde o início do turno (cópia, sem duplicar)."""
+    saida = list(escritos)
     if inicio is not None:
         for sujo in _sujos_desde(raiz, inicio - FOLGA_DO_INICIO_S):
-            if sujo not in escritos:
-                escritos.append(sujo)
-    return escritos, inicio
+            if sujo not in saida:
+                saida.append(sujo)
+    return saida
 
 
 def _e_prompt_humano(obj: dict) -> bool:
@@ -331,8 +348,15 @@ def falhas_para_o_diario(raiz: Path, sessao: str) -> list[dict]:
 # --------------------------------------------------------------------------- #
 
 
-def verificar(raiz: Path, cfg: Config, evento: dict) -> dict | None:
-    """A saída do hook `Stop`: `{decision, reason, systemMessage}`, `{systemMessage}` ou nada."""
+def verificar(
+    raiz: Path, cfg: Config, evento: dict, escritos: list[str] | None = None
+) -> dict | None:
+    """A saída do hook `Stop`: `{decision, reason, systemMessage}`, `{systemMessage}` ou nada.
+
+    `escritos` é a lista de `arquivos_do_turno` quando quem chama já a calculou (o hook
+    formata o turno antes dos sensores, ADR-0014) — ler o transcript duas vezes por `Stop`
+    seria custo à toa numa sessão longa.
+    """
     s = cfg.sensores
     if not s.comandos:
         return None
@@ -342,7 +366,8 @@ def verificar(raiz: Path, cfg: Config, evento: dict) -> dict | None:
     if not ativo:
         estado["bloqueios"] = {}  # turno novo: as tentativas de conserto recomeçam
 
-    escritos, _ = arquivos_do_turno(evento.get("transcript_path"), raiz)
+    if escritos is None:
+        escritos, _ = arquivos_do_turno(evento.get("transcript_path"), raiz)
     falharam = {n for n, u in estado["ultimo"].items() if not u.get("ok")} if ativo else set()
     escolhidos = selecionar(s.comandos, escritos, falharam)
     if not escolhidos:

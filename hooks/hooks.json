@@ -92,33 +92,7 @@
             "command": "python",
             "args": ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/verificar.py"],
             "timeout": 180,
-            "statusMessage": "Rodando os sensores do projeto"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/formatar.py"],
-            "timeout": 30,
-            "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/reafirmar.py"],
-            "timeout": 10,
-            "async": true
+            "statusMessage": "Formatando o turno e rodando os sensores do projeto"
           }
         ]
       }
