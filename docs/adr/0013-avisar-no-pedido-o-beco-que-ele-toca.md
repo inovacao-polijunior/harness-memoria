@@ -150,6 +150,26 @@ disparar. Os do here-string do PowerShell e do `\n` dentro de heredoc seguem em 
 porque essas famílias têm de 4 a 6 variantes, e o 2º colocado é uma variante com 24% a 33%
 de termos em comum, abaixo do limiar.
 
+### Medição em sessões reais
+
+Em 2026-11-12, com o plugin em `85410e3`, os três pedidos de teste rodaram cada um numa
+sessão nova do ValidaNI, sem citar o consultor nem o diário. Cada transcript foi conferido.
+
+| Pedido                    | Aviso entrou                    | Consultor chamado | 1ª chamada da sessão                 | A resposta                                             |
+| ------------------------- | ------------------------------- | ----------------- | ------------------------------------ | ------------------------------------------------------ |
+| Modal dentro da sidebar   | sim, `arquivo/2026-09d.md:99`   | não               | lê a entrada do diário citada        | recusa o `<nav>`, cita o beco e propõe portal          |
+| Worktree a partir do épico | sim, `arquivo/2026-10.md:176`  | não               | lê as notas de orquestração e o diário | põe "a worktree nasce do `master`" no prompt dos agentes |
+| ADR-0056 na tela          | sim, `arquivo/2026-08j.md:53`   | não               | lê a entrada do diário citada        | contesta o número do ADR na tela e cita o beco         |
+
+Comparado com as 5 sessões sem o hook (tabela do Contexto), a lição chegou nas três
+respostas com a citação do diário, inclusive no caso do ADR na tela, em que antes ela não
+apareceu ou apareceu só por um caminho no código. As sessões usaram de 6 a 9 chamadas de
+ferramenta, contra 8 a 12 antes.
+
+O critério de "Quando revisitar" (consultor chamado em pelo menos 2 das 3) não foi atingido:
+0 de 3. O Claude tratou o aviso como suficiente e conferiu o beco ele mesmo, em vez de
+delegar. A busca que o consultor faria (ADRs e o resto do diário) não aconteceu.
+
 ## Alternativas consideradas
 
 ### Aviso a todo pedido que pareça pedir mudança, sem busca
