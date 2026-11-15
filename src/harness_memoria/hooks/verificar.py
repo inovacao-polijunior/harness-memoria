@@ -7,8 +7,11 @@ verificação do `harness.json` e, se algum reprovar, devolve `decision: block` 
 saída e o que fazer — o agente continua o turno em vez de dizer "pronto". A lógica mora em
 `harness_memoria.sensores`; este arquivo é a casca de hook.
 
+Antes dos sensores, formata o que o agente escreveu no turno (ADR-0014).
+
 Falha aberta: timeout, executável ausente e erro do próprio harness liberam o encerramento
-com um `systemMessage`. `HARNESS_MEMORIA_SENSORES=0` desliga sem mexer na config.
+com um `systemMessage`. `HARNESS_MEMORIA_SENSORES=0` desliga os sensores sem mexer na config;
+a formatação continua (para desligá-la, tire `formatadores` do `harness.json`).
 
 Autoteste:  python src/harness_memoria/hooks/verificar.py --autoteste [--projeto CAMINHO]
 """
@@ -62,7 +65,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # A sessão filha do narrador opt-in do SessionEnd também dispara `Stop`; ela não
     # escreve código e não pode ficar presa num sensor.
-    if C.narrando() or os.environ.get("HARNESS_MEMORIA_SENSORES") == "0":
+    if C.narrando():
         return 0
 
     evento = C.ler_evento()
@@ -70,10 +73,55 @@ def main(argv: list[str] | None = None) -> int:
     if ctx is None:
         return 0
     raiz, cfg = ctx
-    saida = sensores.verificar(raiz, cfg, evento)
+    # Uma leitura do transcript serve aos dois: a formatação usa só o que o agente escreveu
+    # por ferramenta; os sensores somam o que o git viu mudar no turno.
+    do_agente, inicio = sensores.escritas_do_transcript(evento.get("transcript_path"))
+    formatar_do_turno(raiz, cfg, do_agente)
+    if os.environ.get("HARNESS_MEMORIA_SENSORES") == "0":
+        return 0
+    escritos = sensores.somar_sujos(raiz, do_agente, inicio) if cfg.sensores.comandos else []
+    saida = sensores.verificar(raiz, cfg, evento, escritos=escritos)
     if saida:
         print(json.dumps(saida, ensure_ascii=False))
     return 0
+
+
+ORCAMENTO_FORMATACAO_S = 30
+
+
+def formatar_do_turno(raiz: Path, cfg, escritos: list[str]) -> None:
+    """ADR-0014: os formatadores do `harness.json`, uma vez por turno, ANTES dos sensores.
+
+    Era o hook `PostToolUse` `formatar.py`, um interpretador por escrita. Aqui roda sobre os
+    arquivos que o agente escreveu no turno por `Write`/`Edit`/…, segundo o transcript — não
+    sobre o que o git viu mudar, que pode ser lockfile ou edição do usuário. Antes dos
+    sensores porque um sensor de estilo tem de ver o arquivo já formatado. A regra por
+    arquivo (extensão, executável no PATH, `exige`, `cwd`) é a de
+    `formatar._talvez_formatar`, sem cópia.
+    """
+    if not escritos or not cfg.formatadores:
+        return
+    import time
+
+    from harness_memoria.hooks.formatar import _talvez_formatar
+
+    # Teto da formatação: o `Stop` tem 180 s no `hooks.json` e os sensores, 120 de orçamento
+    # (`sensores.orcamento_total_s`). Sobram 60; a formatação fica com metade, e o que não
+    # couber fica sem formatar — formatação nunca pode custar o sensor nem o encerramento.
+    limite = time.monotonic() + ORCAMENTO_FORMATACAO_S
+    for caminho in escritos:
+        if time.monotonic() > limite:
+            return
+        p = Path(caminho)
+        if not p.is_file():
+            continue
+        for regra in cfg.formatadores:
+            # O relógio é conferido por COMANDO, e cada comando recebe só o que sobra: com
+            # duas regras na mesma extensão, conferir só entre arquivos deixava passar ~80 s.
+            restante = limite - time.monotonic()
+            if restante <= 0:
+                return
+            _talvez_formatar(regra, p, raiz, timeout=restante)
 
 
 def _autoteste(projeto: str) -> int:

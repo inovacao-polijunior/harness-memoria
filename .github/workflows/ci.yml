@@ -170,14 +170,15 @@ jobs:
                           rel = arg.replace("${CLAUDE_PLUGIN_ROOT}/", "")
                           if not Path(rel).exists():
                               falhas.append(f"hooks.json ({evento}) aponta para `{rel}`, que não existe")
-          # 9: SubagentStart (reusa session_start.py, bloco reduzido) e PreCompact entraram na
-          # onda 4, Stop (verificar.py, sensores — ADR-0007) em 2026-10, e UserPromptSubmit
-          # (avisar_becos.py, aviso de beco — ADR-0013) em 2026-11. `alvos` conta
+          # 7: SubagentStart (reusa session_start.py, bloco reduzido) e PreCompact entraram na
+          # onda 4, Stop (verificar.py, sensores — ADR-0007) em 2026-10, UserPromptSubmit
+          # (avisar_becos.py, aviso de beco — ADR-0013) em 2026-11, e os dois PostToolUse
+          # (formatar, reafirmar) saíram para o Stop e o PreToolUse (ADR-0014). `alvos` conta
           # REGISTRO em hooks.json, não script distinto (session_start é referenciado duas
           # vezes). Este número e o de `tests/test_eventos_novos.py` são os únicos lugares
           # onde a contagem vive — a prosa diz "todo hook".
-          if alvos != 9:
-              falhas.append(f"esperava 9 hooks referenciados, achei {alvos}")
+          if alvos != 7:
+              falhas.append(f"esperava 7 hooks referenciados, achei {alvos}")
 
           for d in Path("skills").iterdir():
               if not (d / "SKILL.md").exists():

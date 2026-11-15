@@ -48,8 +48,10 @@ corresponde a ~5,6% menos chance de conformidade (OR 0,944), e **nenhuma** vari�
 formato do arquivo de instrução tem efeito detectável.
 
 *Consequência de projeto:* a contramedida não pode ser "escrever um `CLAUDE.md` melhor".
-Tem de ser **reinjeção**. Daí `hooks/reafirmar.py` existir. Ele é registrado com
-`async: true` em `hooks.json` (ADR-0003) — e a premissa que esta análise afirmava antes era
+Tem de ser **reinjeção**. Daí `hooks/reafirmar.py` existir. Desde o ADR-0014 a mensagem dele
+sai de dentro do `guardar`, no `PreToolUse` da escrita que fecha o intervalo, sem processo
+próprio. Antes ele era registrado com
+`async: true` em `hooks.json` (ADR-0003, substituído pelo ADR-0014) — e a premissa que esta análise afirmava antes era
 **falsa**: dizia que "saída de hook `async` é descartada pelo Claude Code", quando na
 verdade o binário instalado colhe o resultado do hook assíncrono e entrega o `additionalContext` no turno
 seguinte. O preço de `async` é um turno de atraso numa mensagem cuja função é combater
@@ -125,9 +127,9 @@ src/harness_memoria/
 │   ├── session_start.py (663)  reinjeção (SessionStart) + bloco reduzido (SubagentStart)
 │   ├── session_end.py   (475)  piso determinístico; narração por LLM é OPT-IN
 │   ├── pre_compact.py   (155)  instrui o sumarizador ANTES da compactação (PreCompact)
-│   ├── reafirmar.py     (258)  reinjeção intra-sessão a cada N escritas (async)
+│   ├── reafirmar.py     (258)  texto da reinjeção a cada N escritas (sai pelo guardar, ADR-0014)
 │   ├── guardar.py       (491)  bloqueio determinístico (PreToolUse)
-│   ├── formatar.py      (193)  formatação silenciosa (PostToolUse, async)
+│   ├── formatar.py      (193)  formatação silenciosa (roda no Stop, ADR-0014)
 │   └── verificar.py            sensores do projeto antes de encerrar (Stop) — 2026-10, ADR-0007
 └── auditar/      (1.088) 20+ cheques genéricos + carregamento dos cheques do projeto
 ```
@@ -186,14 +188,13 @@ PreCompact (manual|auto, casado por `trigger`, não por `source`)
 ... trabalho ...
 
 PreToolUse  (Write|Edit|MultiEdit|NotebookEdit|Bash|PowerShell)
-   └─ guardar.py  → permissionDecision: "deny" + motivo acionável
-
-PostToolUse (Write|Edit|MultiEdit|NotebookEdit — dois registros com matchers quase iguais)
-   ├─ formatar.py  (async, silencioso)
-   └─ reafirmar.py (async — a cada 15 escritas, reinjeta as invioláveis; um turno de atraso)
+   └─ guardar.py  → permissionDecision: "deny" + motivo acionável; na escrita liberada,
+      um único additionalContext com o ADR do caminho (ADR-0009) e, a cada 15 escritas, a
+      reafirmação das invioláveis (ADR-0014). Sem PostToolUse: um interpretador por chamada.
 
 Stop (fim de cada turno — 2026-10, ADR-0007)
-   └─ verificar.py → se o turno escreveu arquivo que casa `sensores.comandos[].extensoes`,
+   └─ verificar.py → formata o que o turno escreveu (ADR-0014); depois, se o turno
+      escreveu arquivo que casa `sensores.comandos[].extensoes`,
       roda os sensores em série; reprovação vira `decision: block` com a cauda da saída e a
       remediação (até `max_bloqueios`), o resto falha aberto com `systemMessage`
 

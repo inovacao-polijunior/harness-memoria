@@ -1,6 +1,7 @@
 ---
-status: implemented
+status: superseded
 data: 2026-09-09
+substituido-por: [ADR-0014]
 ---
 
 # ADR-0003 — Rodar a reafirmação intra-sessão como hook async

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Hook PostToolUse — reafirma as invioláveis a cada N escritas da sessão.
+"""Reafirma as invioláveis a cada N escritas da sessão.
+
+Desde o ADR-0014 este arquivo NÃO é registrado no `hooks.json`: o `guardar` (PreToolUse) conta
+as escritas e usa `montar_mensagem` daqui, no mesmo processo. O `main` e o autoteste ficam
+para rodar à mão. O histórico abaixo é do tempo em que ele era um `PostToolUse` próprio.
 
 Fecha o único vão que a evidência aponta e o resto do harness não cobria. O estudo fatorial
 que originou este hook (arXiv:2605.10039, 1.650 sessões de Claude Code) mede o decaimento

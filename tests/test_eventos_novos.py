@@ -205,12 +205,13 @@ def test_numero_de_alvos_bate_com_o_que_o_ci_espera():
 
     5 (linha de base) + 1 (`PreCompact`, mudança 10.1) + 1 (`SubagentStart`, mudança 10.2,
     reusa `session_start.py` — não é arquivo novo) + 1 (`Stop` → `verificar.py`, ADR-0007)
-    + 1 (`UserPromptSubmit` → `avisar_becos.py`, ADR-0013) = 9. Este teste e o job são os
+    + 1 (`UserPromptSubmit` → `avisar_becos.py`, ADR-0013) − 2 (`formatar.py` e
+    `reafirmar.py` saíram do `PostToolUse`, ADR-0014) = 7. Este teste e o job são os
     ÚNICOS lugares onde o número vive; a prosa diz "todo hook", porque número escrito em
     prosa envelhece no hook seguinte.
     """
     alvos = _alvos(_hooks_json())
-    assert len(alvos) == 9, alvos
+    assert len(alvos) == 7, alvos
 
 
 def test_user_prompt_submit_aponta_para_avisar_becos_sincrono():
@@ -254,17 +255,19 @@ def test_subagent_start_aponta_para_session_start_sem_arquivo_novo():
     assert "src/harness_memoria/hooks/session_start.py" in caminhos
 
 
-def test_reafirmar_e_async_decisao_2_do_usuario():
-    """`async: true` — a economia é ~15s numa sessão de 120 escritas (ver docstring de
-    `reafirmar.py`, já corrigido para descrever o mecanismo real: o binário instalado colhe
-    o resultado do hook assíncrono e entrega no turno seguinte, não descarta."""
+def test_nenhum_hook_por_ferramenta_alem_da_guarda():
+    """ADR-0014: por chamada de ferramenta roda UM interpretador, o `guardar` síncrono.
+
+    A reafirmação mora no mesmo processo (ver `test_hooks_quentes.py`) e a formatação foi
+    para o `Stop` (ver `test_verificar.py`). Um `PostToolUse` de volta seria outro processo
+    Python por escrita.
+    """
     hk = _hooks_json()
-    for entrada in hk["hooks"]["PostToolUse"]:
-        for h in entrada["hooks"]:
-            if any("reafirmar.py" in a for a in h.get("args", [])):
-                assert h.get("async") is True
-                return
-    pytest.fail("entrada de reafirmar não encontrada em PostToolUse")
+    assert "PostToolUse" not in hk["hooks"]
+    (pre,) = hk["hooks"]["PreToolUse"]
+    (h,) = pre["hooks"]
+    assert h["args"] == ["${CLAUDE_PLUGIN_ROOT}/src/harness_memoria/hooks/guardar.py"]
+    assert "async" not in h, "guarda que bloqueia não pode ser async (ADR-0003)"
 
 
 def test_session_start_matcher_inclui_fork():

@@ -250,10 +250,8 @@ Os registros de `hooks/hooks.json` (`session_start.py` atende dois eventos):
 | `avisar_becos`  | UserPromptSubmit            | busca por texto, em todos os becos do diário, o que o pedido parece tocar; quando passa da regra, injeta o beco junto do pedido e manda chamar o consultor da memória (ADR-0013). Mede ~39 ms por pedido num diário de 340 becos |
 | `pre_compact`   | PreCompact                  | instrui o sumarizador a preservar invioláveis e IDs de ADR ANTES da compactação — stdout cru, custo de contexto ZERO |
 | `session_end`   | SessionEnd                  | grava o **piso determinístico** da sessão (arquivos, comandos, falhas observadas — comando que falhou, guarda ou permissão que negou —, diffstat, ADRs tocados); narrativa por `claude -p` é **opt-in** (ver abaixo) |
-| `reafirmar`     | PostToolUse (`async`)       | reafirma as invioláveis a cada N escritas                            |
-| `guardar`       | PreToolUse                  | bloqueia `.env`, `--no-verify`, `git add --force` e os caminhos proibidos do projeto |
-| `formatar`      | PostToolUse (`async`)       | roda os formatadores configurados no arquivo editado                 |
-| `verificar`     | Stop                        | quando o turno escreveu código, roda os **sensores** do projeto e, se algum reprovar, bloqueia o encerramento com a cauda da saída e o que fazer (ver abaixo) |
+| `guardar`       | PreToolUse                  | bloqueia `.env`, `--no-verify`, `git add --force` e os caminhos proibidos do projeto; na escrita liberada, injeta o ADR do caminho e, a cada N escritas, reafirma as invioláveis (ADR-0014). É o único hook por chamada de ferramenta |
+| `verificar`     | Stop                        | formata o que o turno escreveu com os formatadores do projeto (ADR-0014) e, quando o turno escreveu código, roda os **sensores** do projeto e, se algum reprovar, bloqueia o encerramento com a cauda da saída e o que fazer (ver abaixo) |
 
 | Skill               | Para quê                                            |
 | ------------------- | --------------------------------------------------- |

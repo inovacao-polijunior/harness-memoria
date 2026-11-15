@@ -423,3 +423,105 @@ def test_piso_do_session_end_lista_o_sensor_vermelho(projeto: Path, tmp_path: Pa
 )
 def test_pergunta_ao_usuario_e_detectada_no_fim_da_mensagem(mensagem: str, pergunta: bool):
     assert sensores.termina_com_pergunta(mensagem) is pergunta
+
+
+# --------------------------------------------------------------------------- #
+# Formatação do turno no `Stop` (ADR-0014): era um `PostToolUse` por escrita
+# --------------------------------------------------------------------------- #
+
+_MAIUSCULAS = (
+    "import pathlib, sys; p = pathlib.Path(sys.argv[1]); "
+    "p.write_text(p.read_text(encoding='utf-8').upper(), encoding='utf-8')"
+)
+
+
+def _formatador(raiz: Path, **extra) -> None:
+    escrever_config(
+        raiz,
+        {
+            "formatadores": [
+                {"extensoes": [".py"], "comando": [sys.executable, "-c", _MAIUSCULAS, "{arquivo}"]}
+            ],
+            **extra,
+        },
+    )
+
+
+def test_stop_formata_o_que_o_turno_escreveu(projeto: Path, tmp_path: Path):
+    _formatador(projeto)
+    r = _rodar(projeto, _turno_que_escreveu(tmp_path, projeto), "s-fmt")
+    assert _saida(r) == {}, "formatar segue silencioso"
+    assert (projeto / "scripts" / "x.py").read_text(encoding="utf-8") == "X = 1\n"
+
+
+def test_stop_formata_antes_dos_sensores(projeto: Path, tmp_path: Path):
+    """O sensor de estilo tem de ver o arquivo já formatado."""
+    alvo = projeto / "scripts" / "x.py"
+    exige_maiusculo = [
+        sys.executable,
+        "-c",
+        f"import sys; sys.exit(0 if open({str(alvo)!r}).read().isupper() else 1)",
+    ]
+    _formatador(projeto, sensores={"comandos": [{"nome": "estilo", "comando": exige_maiusculo}]})
+    r = _rodar(projeto, _turno_que_escreveu(tmp_path, projeto), "s-fmt-antes")
+    assert _saida(r) == {}
+
+
+def test_stop_formata_mesmo_com_sensores_desligados(projeto: Path, tmp_path: Path):
+    _formatador(projeto)
+    r = _rodar(
+        projeto,
+        _turno_que_escreveu(tmp_path, projeto),
+        "s-fmt-off",
+        env_extra={"HARNESS_MEMORIA_SENSORES": "0"},
+    )
+    assert _saida(r) == {}
+    assert (projeto / "scripts" / "x.py").read_text(encoding="utf-8") == "X = 1\n"
+
+
+def test_stop_sem_escrita_nao_formata(projeto: Path, tmp_path: Path):
+    _formatador(projeto)
+    alvo = projeto / "scripts" / "x.py"
+    alvo.write_text("x = 1\n", encoding="utf-8")
+    t = _transcript(tmp_path, [_prompt("só uma pergunta", "2026-10-09T10:00:00.000Z")])
+    _saida(_rodar(projeto, t, "s-fmt-nada"))
+    assert alvo.read_text(encoding="utf-8") == "x = 1\n"
+
+
+def test_stop_nao_formata_o_que_so_o_git_viu_mudar(projeto: Path, tmp_path: Path):
+    """Lockfile de `npm install` ou edição do usuário no editor aparece sujo no git durante o
+    turno; o formatador só reescreve o que o agente escreveu por ferramenta."""
+    subprocess.run(["git", "init", "-q"], cwd=projeto, check=True)
+    _formatador(projeto)
+    do_agente = projeto / "scripts" / "x.py"
+    do_agente.write_text("x = 1\n", encoding="utf-8")
+    alheio = projeto / "scripts" / "do_usuario.py"
+    alheio.write_text("y = 2\n", encoding="utf-8")
+    agora = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 60))
+    t = _transcript(tmp_path, [_prompt("faça X", agora), _escrita(str(do_agente), agora)])
+    assert _saida(_rodar(projeto, t, "s-fmt-git")) == {}
+    assert do_agente.read_text(encoding="utf-8") == "X = 1\n"
+    assert alheio.read_text(encoding="utf-8") == "y = 2\n"
+
+
+def test_formatacao_respeita_o_teto_por_comando(projeto: Path, monkeypatch):
+    """O teto vale por comando, não só entre arquivos: cada um recebe o que sobra."""
+    from harness_memoria.hooks import formatar, verificar
+
+    _formatador(projeto)
+    cfg = carregar(projeto)
+    regra = cfg.formatadores[0]
+    object.__setattr__(cfg, "formatadores", (regra, regra))
+    chamadas: list[float] = []
+
+    def lento(_regra, _arquivo, _raiz, timeout):
+        chamadas.append(timeout)
+        time.sleep(0.3)
+
+    monkeypatch.setattr(formatar, "_talvez_formatar", lento)
+    monkeypatch.setattr(verificar, "ORCAMENTO_FORMATACAO_S", 0.5)
+    alvo = projeto / "scripts" / "x.py"
+    alvo.write_text("x\n", encoding="utf-8")
+    verificar.formatar_do_turno(projeto, cfg, [str(alvo), str(alvo)])
+    assert len(chamadas) == 2, "o 3º comando não cabia no teto"
+    assert all(t <= 0.5 for t in chamadas) and chamadas[1] < 0.3
